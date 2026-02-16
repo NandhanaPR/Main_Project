@@ -3,20 +3,9 @@ import Chart from 'chart.js/auto';
 
 const NUM_SAMPLES = 20;
 
-// ==============================
-// DUMMY DATA – REPLACE WITH MODEL OUTPUT
-// When integrating ML:
-// - trims  ← real-time OBD fuel trim
-// - optimizedTrims ← LSTM Regressor output
-// ==============================
-
-const initialTrims = Array.from({ length: NUM_SAMPLES }, () =>
-  parseFloat((Math.random() * 10 - 5).toFixed(2))
-);
-
-const initialOptimized = initialTrims.map(t =>
-  parseFloat((t * 0.8 + (Math.random() * 2 - 1)).toFixed(2))
-);
+// Initialize with zeros so the graph starts clean and waits for real data
+const initialTrims = Array(NUM_SAMPLES).fill(0);
+const initialOptimized = Array(NUM_SAMPLES).fill(0);
 
 export default function OptimizationPage() {
   const [trims, setTrims] = useState(initialTrims);
@@ -58,8 +47,14 @@ export default function OptimizationPage() {
         maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom' } },
         scales: {
-          y: { min: -15, max: 15, title: { display: true, text: 'Fuel Trim (%)' } },
-          x: { title: { display: true, text: 'Time Sample (Most Recent on Right)' } }
+          y: { 
+            min: -15, 
+            max: 15, 
+            title: { display: true, text: 'Fuel Trim (%)' } 
+          },
+          x: { 
+            title: { display: true, text: 'Time Sample (Most Recent on Right)' } 
+          }
         }
       }
     });
@@ -68,18 +63,35 @@ export default function OptimizationPage() {
   useEffect(() => {
     initChart(chartRef.current);
 
-    // Dummy streaming simulation
-    const interval = setInterval(() => {
-      const newTrim = parseFloat((Math.random() * 10 - 5).toFixed(2));
-      const newOptimized = parseFloat((newTrim * 0.8 + (Math.random() * 2 - 1)).toFixed(2));
+    // Function to fetch real data from your backend
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/optimization');
+        const data = await response.json();
 
-      setTrims(prev => [...prev.slice(1), newTrim]);
-      setOptimizedTrims(prev => [...prev.slice(1), newOptimized]);
-    }, 4000);
+        // Ensure we have valid numbers before updating state
+        if (data.actual !== undefined && data.predicted !== undefined) {
+          setTrims(prev => [...prev.slice(1), data.actual]);
+          setOptimizedTrims(prev => [...prev.slice(1), data.predicted]);
+        } else if (data.error) {
+          console.error("Model Error:", data.error);
+        }
+      } catch (err) {
+        console.error("Connection Error to Backend:", err);
+      }
+    };
+
+    // Run immediately on load
+    fetchData();
+
+    // Set interval to fetch real predictions every 3 seconds
+    const interval = setInterval(fetchData, 3000);
 
     return () => {
       clearInterval(interval);
-      chartInstanceRef.current?.destroy();
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+      }
     };
   }, [initChart]);
 
@@ -88,7 +100,7 @@ export default function OptimizationPage() {
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h2 className="text-3xl font-bold mb-2">Fuel Trim Optimization</h2>
         <p className="text-gray-500 mb-6">
-          Comparing real-time OBD fuel trims with LSTM-optimized values.
+          Comparing real-time OBD fuel trims with XGBoost-optimized values.
         </p>
 
         <div className="h-[500px]">

@@ -39,7 +39,25 @@ app.get('/api/leak', (req, res) => {
     });
 });
 
+// backend/server.js - Add this new endpoint
+app.get('/api/optimization', (req, res) => {
+    const scriptPath = path.join(__dirname, 'scripts', 'fuel_predict.py');
+    const pythonProcess = spawn('python', [scriptPath]);
+
+    let dataString = '';
+    pythonProcess.stdout.on('data', (data) => { dataString += data.toString(); });
+
+    pythonProcess.on('close', (code) => {
+        try {
+            const result = JSON.parse(dataString);
+            res.json(result);
+        } catch (e) {
+            res.status(500).json({ error: "Parse Error", details: dataString });
+        }
+    });
+});
+
 const PORT = 5000;
 app.listen(PORT, () => {
-    console.log('✅ Backend running at http://localhost:${PORT}');
+    console.log(`✅ Backend running at http://localhost:${PORT}`);
 });
